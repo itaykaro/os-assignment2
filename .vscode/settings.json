@@ -3,7 +3,9 @@
         "types.h": "c",
         "riscv.h": "c",
         "defs.h": "c",
-        "spinlock.h": "c",
-        "stat.h": "c"
+        "sleeplock.h": "c",
+        "user.h": "c",
+        "stat.h": "c",
+        "spinlock.h": "c"
     },
 }
