@@ -105,9 +105,9 @@ uint64 sys_channel_take(void) {
   int cd;
   uint64 data;
   
-  argint(1, &cd);
-  argaddr(2, &data);
-  return channel_take(cd, &data);
+  argint(0, &cd);
+  argaddr(1, &data);
+  return channel_take(cd, (int*)data);
 }
 
 uint64 sys_channel_destroy(void) {

@@ -22,6 +22,8 @@ void
 acquire(struct spinlock *lk)
 {
   push_off(); // disable interrupts to avoid deadlock.
+  //write(0, "acquiring lk ", 14);
+  //write(0, lk->name, sizeof(lk->name));
   if(holding(lk))
     panic("acquire");
 

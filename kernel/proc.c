@@ -66,6 +66,7 @@ void channelinit(void) {
       initlock(&c->lock, "channel");
       c->creator_pid = -1;
       c->data = 0;
+      c->has_data = 0;
   }
 }
 
@@ -713,6 +714,8 @@ channel_create(void)
     if(c->creator_pid == -1){
       c->creator_pid = p->pid;
       c->data = 0;
+      c->has_data = 0;
+      release(&c->lock);
       return i;
     }
     release(&c->lock);
@@ -725,47 +728,55 @@ int channel_put(int cd, int data) {
   if(cd < 0 || cd >= MAXCHANNELS)
     return -1;
 
-  struct channel ch = channel[cd];
-  acquire(&ch.lock);
-  while (ch.has_data == 1) {
-    sleep(&ch.data, &ch.lock);
-    if (ch.creator_pid == -1) {
+  struct channel *ch = &channel[cd];
+  acquire(&ch->lock);
+
+  while (ch->has_data == 1) {
+    if (ch->creator_pid == -1) {
+      release(&ch->lock);
       return -1;
     }
+    sleep(&ch->data, &ch->lock);
+
   }
-  ch.data = data;
-  wakeup(&ch.data);
-  release(&ch.lock);
+  ch->data = data;
+  ch->has_data = 1;
+
+  wakeup(&ch->data);
+  release(&ch->lock);
   return 0;
 }
 
-int channel_take(int cd, uint64 data) {
+int channel_take(int cd, int* data) {
   if(cd < 0 || cd >= MAXCHANNELS)
     return -1;
-  
-  struct channel ch = channel[cd];
-  acquire(&ch.lock);
-  while (ch.has_data == 0){
-    sleep(&ch.data, &ch.lock);
-    if (ch.creator_pid == -1) {
+  struct channel *ch = &channel[cd];
+  acquire(&ch->lock);
+  while (ch->has_data == 0){
+    if (ch->creator_pid == -1) {
+      release(&ch->lock);
       return -1;
     }
+    sleep(&ch->data, &ch->lock);
   }
-  (*data) = ch.data;
-  wakeup(&ch.data);
-  release(&ch.lock);
+  struct proc *p = myproc();
+  copyout(p->pagetable, (uint64)data, (char *)&ch->data, sizeof(ch->data));
+  ch->has_data = 0;
+  wakeup(&ch->data);
+  release(&ch->lock);
   return 0;
 }
 
 int channel_destroy(int cd) {
   if(cd < 0 || cd >= MAXCHANNELS)
     return -1;
-  struct channel ch = channel[cd];
-  acquire(&ch.lock);
-  ch.creator_pid = -1;
-  ch.has_data = 0;
-  ch.data = 0;
-  wakeup(&ch.data);
-  release(&ch.lock);
+  struct channel *ch = &channel[cd];
+  printf("channel destroy %d\n", cd);
+  acquire(&ch->lock);
+  ch->creator_pid = -1;
+  ch->has_data = 0;
+  ch->data = 0;
+  wakeup(&ch->data);
+  release(&ch->lock);
   return 0;
 }

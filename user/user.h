@@ -23,7 +23,7 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int channel_create(void);
-int channel_take(int, uint64);
+int channel_take(int, int*);
 int channel_destroy(int);
 int channel_put(int, int);
 
