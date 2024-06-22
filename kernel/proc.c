@@ -10,6 +10,8 @@ struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
 
+struct channel channel[MAXCHANNELS];
+
 struct proc *initproc;
 
 int nextpid = 1;
@@ -55,6 +57,15 @@ procinit(void)
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
+  }
+}
+
+void channelinit(void) {
+  struct channel *c;
+  for(c = channel; c < &channel[MAXCHANNELS]; c++) {
+      initlock(&c->lock, "channel");
+      c->creator_pid = -1;
+      c->data = 0;
   }
 }
 
@@ -377,6 +388,15 @@ exit(int status)
 
   p->xstate = status;
   p->state = ZOMBIE;
+  
+  struct channel *c;
+  // for(c = channel; c < &channel[MAXCHANNELS]; c++) {
+  for(int i = 0; i < MAXCHANNELS; i++) {
+    c = &channel[i];
+    if (&c->creator_pid == &p->pid) {
+      channel_destroy(i);
+    }
+  }
 
   release(&wait_lock);
 
@@ -680,4 +700,72 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+int
+channel_create(void)
+{
+  struct proc *p = myproc();
+  struct channel *c;
+  int i = 0;
+  for(c = channel; c < &channel[MAXCHANNELS]; c++) {
+    acquire(&c->lock);
+    if(c->creator_pid == -1){
+      c->creator_pid = p->pid;
+      c->data = 0;
+      return i;
+    }
+    release(&c->lock);
+    i++;
+  }
+  return -1;
+}
+
+int channel_put(int cd, int data) {
+  if(cd < 0 || cd >= MAXCHANNELS)
+    return -1;
+
+  struct channel ch = channel[cd];
+  acquire(&ch.lock);
+  while (ch.has_data == 1) {
+    sleep(&ch.data, &ch.lock);
+    if (ch.creator_pid == -1) {
+      return -1;
+    }
+  }
+  ch.data = data;
+  wakeup(&ch.data);
+  release(&ch.lock);
+  return 0;
+}
+
+int channel_take(int cd, uint64 data) {
+  if(cd < 0 || cd >= MAXCHANNELS)
+    return -1;
+  
+  struct channel ch = channel[cd];
+  acquire(&ch.lock);
+  while (ch.has_data == 0){
+    sleep(&ch.data, &ch.lock);
+    if (ch.creator_pid == -1) {
+      return -1;
+    }
+  }
+  (*data) = ch.data;
+  wakeup(&ch.data);
+  release(&ch.lock);
+  return 0;
+}
+
+int channel_destroy(int cd) {
+  if(cd < 0 || cd >= MAXCHANNELS)
+    return -1;
+  struct channel ch = channel[cd];
+  acquire(&ch.lock);
+  ch.creator_pid = -1;
+  ch.has_data = 0;
+  ch.data = 0;
+  wakeup(&ch.data);
+  release(&ch.lock);
+  return 0;
 }
