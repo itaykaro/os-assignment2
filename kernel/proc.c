@@ -731,13 +731,19 @@ int channel_put(int cd, int data) {
   struct channel *ch = &channel[cd];
   acquire(&ch->lock);
 
+  
+
   while (ch->has_data == 1) {
     if (ch->creator_pid == -1) {
       release(&ch->lock);
       return -1;
     }
     sleep(&ch->data, &ch->lock);
-
+    
+  }
+  if (ch->creator_pid == -1) {
+    release(&ch->lock);
+    return -1;
   }
   ch->data = data;
   ch->has_data = 1;
@@ -759,6 +765,10 @@ int channel_take(int cd, int* data) {
     }
     sleep(&ch->data, &ch->lock);
   }
+  if (ch->creator_pid == -1) {
+    release(&ch->lock);
+    return -1;
+  }
   struct proc *p = myproc();
   copyout(p->pagetable, (uint64)data, (char *)&ch->data, sizeof(ch->data));
   ch->has_data = 0;
@@ -771,7 +781,6 @@ int channel_destroy(int cd) {
   if(cd < 0 || cd >= MAXCHANNELS)
     return -1;
   struct channel *ch = &channel[cd];
-  printf("channel destroy %d\n", cd);
   acquire(&ch->lock);
   ch->creator_pid = -1;
   ch->has_data = 0;

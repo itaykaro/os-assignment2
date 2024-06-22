@@ -26,9 +26,9 @@ int main(int argc, char *argv[]) {
         }
         int result;
         result = channel_take(cd, &data); // 43
-        // printf("Returned with code %d. Took %d from cd %d\n", result, data, cd);
+        printf("Returned with code %d. Took %d from cd %d\n", result, data, cd);
         result = channel_take(cd, &data); // Sleep until child destroys channel
-        // printf("Returned with code %d. Took %d from cd %d\n", result, data, cd);
+        printf("Returned with code %d. Took %d from cd %d\n", result, data, cd);
     }
     return 0;
 }
